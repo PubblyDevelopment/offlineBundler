@@ -20,5 +20,3 @@ replaceArray = [
 	["rp2", "replaced 2"],
 	["rp3", "replaced 3"]
 ]
-
-print(replaceAll(origStr, replaceArray))

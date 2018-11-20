@@ -10,7 +10,8 @@ class OfflineBundler:
     def __init__(self, mn, en):
         self.mapName = mn
         self.errors = []
-        self.targetPath = os.getcwd() + "/map/" + mn
+        self.cwd = os.getcwd()
+        self.targetPath = self.cwd + "/map/" + mn
         self.engineNo = open(en,"r").read()
 
     def checkIfEntryPointExists(self):
@@ -95,38 +96,37 @@ class OfflineBundler:
 
     def buildRunHTML(self):
         for u in self.units:
+
             # Copy run html to each unit
-            print(self.stagePath + u)
-            shutil.copy('run.html', self.stagePath + u)
+            try:
+                shutil.copy(self.cwd + '/run.html', self.stagePath + u)
+            except:
+                self.errors.append("Fatal: Copying over run files failed.")
 
-            '''
-            with fileinput.FileInput("run.html", inplace="True") as file:
-                for line in file:
-                    print ("please do something :)")
-                    print(strr.replaceAll(
-                        line, [
-                            ["{REL_ROOT}", "."],
-                            ["{ENGINE}", self.engineNo]
-                        ]))
-            '''
+            # Grab the appropriate JSON file
+            with open(self.jsonFiles[u], 'r') as someFile:
+                jsonData = someFile.read()
 
-            #self.jsonFiles[u]
+            # Overwrite new run file with appropriate info
+            try:
+                with fileinput.FileInput(self.stagePath + u + "/run.html", inplace="True") as file:
+                    for line in file:
+                        print(strr.replaceAll(
+                            line, [
+                                ["{REL_ROOT}", ".."],
+                                ["{ENGINE}", self.engineNo],
+                                ["{PUBBLY_JSON}", jsonData]
+                            ]), end='')
+            except:
+                self.errors.append("Fatal: Constructing run files failed.")
 
-        # Replace some shiittttttt
-        '''
-        with fileinput.FileInput("practice.html", inplace="True", backup='.bak') as file:
-            for line in file:
-                # line is "asdf {REL_ROOT} {ENGINE}"
-                line = strr.replaceAll(
-                    line, [
-                        ["{REL_ROOT}","."],
-                        ["{ENGINE}", self.engineNo]
-                        #["podfgdsfgop", "dfgsdfgsdfpoop"]
-
-                    ])
-
-        print (self.unitJSON)
-        '''
+    def copyEngineShared(self):
+        #try:
+            #print(os.getcwd() + "/engine/" + self.engineNo)
+            #print(self.stagePath)
+        shutil.copytree(self.cwd + "/engine/", self.stagePath + "/engine")
+        #except:
+        #    self.errors.append("Fatal: Engine not found.")
 
     def getErrors(self):
         if (len(self.errors) is 0):
@@ -141,6 +141,7 @@ class OfflineBundler:
         #self.copyToStagingArea()
         self.checkJSONExistsNewerEngine()
         self.buildRunHTML()
+        self.copyEngineShared()
         self.getErrors()
 
     '''
