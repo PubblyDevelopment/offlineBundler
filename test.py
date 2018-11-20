@@ -6,6 +6,9 @@ from shutil import *
 import fileinput
 import strreplace as strr
 
+## BIG TODO:
+## CHECK IF MULTIPLE ENGINES EXIST, DELETE/IGNORE OLD, USE NEW
+
 class OfflineBundler:
     def __init__(self, mn, en):
         self.mapName = mn
@@ -13,6 +16,9 @@ class OfflineBundler:
         self.cwd = os.getcwd()
         self.targetPath = self.cwd + "/map/" + mn
         self.engineNo = open(en,"r").read()
+        self.units = next(os.walk(self.targetPath))[1]
+        if 'stagingArea' in self.units:
+            self.units.remove('stagingArea')     
 
     def checkIfEntryPointExists(self):
         if not os.path.isfile(self.targetPath + "/entryPoint.txt"):
@@ -21,18 +27,16 @@ class OfflineBundler:
             self.entryPoint = open(self.targetPath + "/entryPoint.txt", "r").read()
 
     def copyToStagingArea(self):
-        print ()
-        if not os.path.exists("stagingArea"):
-            try:
-                shutil.copytree(self.targetPath, self.targetPath+ "/stagingArea", ignore=ignore_patterns("entryPoint.*", "test.py"))
-            except:
-                self.errors.append("Fatal: Copy of node folders failed for some reason.")
-        else:
-            self.errors.append("Fatal: Old staging area folder already exists.")
+        #print (self.cwd)
+        #if not os.path.exists("stagingArea"):
+            #try:
+        shutil.copytree(self.targetPath, self.targetPath + "/stagingArea", ignore=ignore_patterns("entryPoint.*", "test.py", "*.sh", "*.html"))
+            #except:
+            #    self.errors.append("Fatal: Copy of node folders failed for some reason.")
+        #else:
+            #self.errors.append("Fatal: Old staging area folder already exists.")
 
     def checkJSONExistsNewerEngine(self):
-        self.units = next(os.walk(self.targetPath))[1]
-        self.units.remove("stagingArea")
 
         self.stagePath = self.targetPath + "/stagingArea/"
         self.jsonFiles = {}
@@ -48,7 +52,7 @@ class OfflineBundler:
                         self.jsonFiles[u] = unitJSON
                         version = (f[f.index("1"):f.index(".json")])
                         if version != self.engineNo:
-                            self.errors.append("Fatal: Using wrong engine. This file appears to be " + version + ".")
+                            self.errors.append("Fatal: Outdated engine (" + version + ") at\n" + self.stagePath + u)
                     except:
                         self.errors.append("Fatal: Something went wrong. Missing JSON, maybe?")
 
@@ -56,14 +60,15 @@ class OfflineBundler:
                     unitXML = self.stagePath + u + "/" + f
 
             if not unitJSON:
-                self.errors.append("Fatal: JSON file missing at " + self.stagePath + u)
-                break;
+                self.errors.append("Fatal: JSON file missing at\n" + self.stagePath + u)
+            else:
+                if self.isNewer(unitJSON, unitXML):
+                    self.errors.append("Warning: JSON outdated at\n" + u)
             if not unitXML:
-                self.errors.append("Fatal: XML file missing at " + self.stagePath + u)
+                self.errors.append("Fatal: XML file missing at\n" + self.stagePath + u)
                 break;
 
-            if self.isNewer(unitJSON, unitXML):
-                self.errors.append("Warning: JSON outdated at " + u)
+            
 
 
         '''
@@ -95,9 +100,51 @@ class OfflineBundler:
             return (result < 0)
 
     def buildRunHTML(self):
+        print ("i hate you")
         for u in self.units:
+            print (self.cwd + "/run.html")
+            shutil.copy(self.cwd + '/run.html', self.stagePath)
 
-            # Copy run html to each unit
+            with open(self.jsonFiles[u], 'r') as someFile:
+                jsonData = someFile.read()
+
+            print (self.stagePath + "run.html")
+
+            try:
+                with fileinput.FileInput(self.stagePath + "run.html", inplace="True") as file:
+                    for line in file:
+                        print(strr.replaceAll(
+                            line, [
+                                ["{REL_ROOT}", ".."],
+                                ["{ENGINE}", self.engineNo],
+                                ["{PUBBLY_JSON}", jsonData]
+                            ]), end='')
+            except:
+                self.errors.append("Fatal: Constructing run files failed.")
+
+            os.rename(self.stagePath + "run.html", self.stagePath + u + ".html")
+
+            # Overwrite new run file with appropriate info
+        '''
+            try:
+                with fileinput.FileInput(self.stagePath + u + "/run.html", inplace="True") as file:
+                    for line in file:
+                        print(strr.replaceAll(
+                            line, [
+                                ["{REL_ROOT}", ".."],
+                                ["{ENGINE}", self.engineNo],
+                                ["{PUBBLY_JSON}", jsonData]
+                            ]), end='')
+            except:
+                self.errors.append("Fatal: Constructing run files failed.")
+
+            os.rename(self.stagePath + u + '/run.html', self.stagePath + u + '/' + u + '.html')
+
+
+        
+            # Copy run html to each unit'''
+        '''
+            
             try:
                 shutil.copy(self.cwd + '/run.html', self.stagePath + u)
             except:
@@ -118,7 +165,7 @@ class OfflineBundler:
                                 ["{PUBBLY_JSON}", jsonData]
                             ]), end='')
             except:
-                self.errors.append("Fatal: Constructing run files failed.")
+                self.errors.append("Fatal: Constructing run files failed.")'''
 
     def copyEngineShared(self):
         #try:
@@ -132,7 +179,7 @@ class OfflineBundler:
         if (len(self.errors) is 0):
             print ("Success! File made at: DO THIS LATER LOL")
         else:
-            print ("Errors found: ")
+            print (str(len(self.errors)) + " errors found: ")
             for e in self.errors:
                 print ("* " + e)
 
@@ -141,7 +188,7 @@ class OfflineBundler:
         #self.copyToStagingArea()
         self.checkJSONExistsNewerEngine()
         self.buildRunHTML()
-        self.copyEngineShared()
+        #self.copyEngineShared()
         self.getErrors()
 
     '''
@@ -151,5 +198,5 @@ class OfflineBundler:
         print (path)
     '''
 
-offObj = OfflineBundler("test","latest.txt")
+offObj = OfflineBundler("EpicQuest","latest.txt")
 offObj.doTheThing()
